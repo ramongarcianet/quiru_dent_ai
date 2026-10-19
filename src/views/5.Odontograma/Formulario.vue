@@ -7,7 +7,6 @@ import { detenerVoz, activarVoz, isSpeech, speechError, Hallazgo, item, paginaOd
 import { actualizarDetalle, leerEnRegistro, item as itemodontograma, agregarLista, mensajeExistePieza, getItemEnRegistro, validaDoble } from '../../store/formodontograma';
 import { VerFormato } from "../../store/Canvas";
 import { useRoute, useRouter } from "vue-router";
-import { previousPage, nextPage, setList, registro_ as _hallazgosPag, setListDelete, SetPage } from "../../config/Paginator";
 import { listaDeDientesCombo, listaDeHallazgos as _Hallazgos } from '../../config/Parametros';
 import vSelect from "vue-select"
 
@@ -27,7 +26,6 @@ const _listaDeHallazgos = computed(() => {
 onMounted(() => {
   paginaOdontograma.value = true;
   _tipoOdonto.value = route.params.tipoOdonto;
-  setList(itemodontograma.value.hallazgos, 1);
 })
 
 watch(
@@ -56,7 +54,6 @@ watch(
   (registro) => {
     let idOdontograma = route.params.idOdontograma
     VerFormato((itemodontograma.value?.hallazgos?.length > 0) ? itemodontograma.value?.hallazgos : [])
-    setList((itemodontograma.value?.hallazgos?.length > 0) ? itemodontograma.value?.hallazgos : [], 1);
     limpiarSinVoz()
   },
   { deep: true }
@@ -84,7 +81,6 @@ const borrar = ({ diente, hallazgo, ubicacion }) => {
   if (index > -1) {
     itemodontograma.value?.hallazgos.splice(index, 1)
     actualizarDetalle(itemodontograma.value.id, (itemodontograma.value?.hallazgos.length > 0) ? itemodontograma.value?.hallazgos : [])
-    setListDelete((itemodontograma.value?.hallazgos.length > 0) ? itemodontograma?.value?.hallazgos : []);
   }
 }
 function LimpiarMensaje() {
@@ -320,46 +316,60 @@ function onKeyDownSoloLetras(event) {
   .col.d-flex.justify-content-center.item
     OdonOficial
   .col.item
-    .div(style="background-color: white; border-radius: 2%;")
-      table.table.table-hover
-        thead(style='position: sticky;top: 0; background-color: #eef4ff!important; font-weight: bold; color:var(--brand-navy);')
-          tr
-            th N°
-            th Pieza
-            th Hallazgo
-            th Sigla
-            th
-        tbody
-          tr(v-for="item of _hallazgosPag")
-            td {{ item.fila }}
-            td {{ item.diente }} {{ item.dienteAlterno !=""? " - " + item.dienteAlterno : ""}}
-            td {{ item.descripcion }} {{ item.ubicacion!='' ? ' - '+ item.ubicacion : item.ubicacion }}
-            td {{ item.sigla }}
-            td
-              BotonSeguro.mt-0( :onSuccess= '() => borrar(item)' :hidden="itemodontograma?.estado === '1' && !itemodontograma.idRelacionado")
-                i.bi.bi-trash(aria-hidden='true')
-      .div(v-if="itemodontograma?.hallazgos?.length > 8",style="text-align: center;")
-        nav.d-flex.justify-content-center(aria-label='Page navigation example')
-          ul.pagination
-            li.page-item
-              a.page-link(href='#', aria-label='Previous', @click="previousPage(itemodontograma.hallazgos)")
-                span(aria-hidden='true',style="font-size: 1rem; font-weight: bold;") &laquo;
-            li.page-item(v-for="n in (Math.trunc(itemodontograma?.hallazgos?.length / 8) + (((itemodontograma?.hallazgos?.length % 8) > 0) ? 1 : 0))")
-              a.page-link(href='#', @click='SetPage(itemodontograma.hallazgos, n)') {{ n }}
-            li.page-item
-              a.page-link(href='#', aria-label='Next', @click="nextPage(itemodontograma?.hallazgos)")
-                span(aria-hidden='true', style="font-size: 1rem; font-weight: bold;") &raquo;
+    .findings-list
+      .card.table-heading.mb-1.d-none.d-md-block
+        .row.align-items-center.p-2
+          .col-1 N°
+          .col-2 Pieza
+          .col-6 Hallazgo
+          .col-2 Sigla
+          .col-1
+      .card.finding-row.mb-2.p-2(v-for="(hallazgo, index) of itemodontograma?.hallazgos" :key="`${hallazgo.diente}-${hallazgo.hallazgo}-${hallazgo.ubicacion}-${index}`")
+        .row.align-items-center.g-2.p-1
+          .col-4.d-md-none.finding-label N°
+          .col-8.col-md-1 {{ index + 1 }}
+          .col-4.d-md-none.finding-label Pieza
+          .col-8.col-md-2 {{ hallazgo.diente }} {{ hallazgo.dienteAlterno != "" ? " - " + hallazgo.dienteAlterno : "" }}
+          .col-4.d-md-none.finding-label Hallazgo
+          .col-8.col-md-6 {{ hallazgo.descripcion }} {{ hallazgo.ubicacion != '' ? ' - ' + hallazgo.ubicacion : hallazgo.ubicacion }}
+          .col-4.d-md-none.finding-label Sigla
+          .col-6.col-md-2 {{ hallazgo.sigla }}
+          .col-2.col-md-1.text-end
+            BotonSeguro.mt-0(:onSuccess='() => borrar(hallazgo)' :hidden="itemodontograma?.estado === '1' && !itemodontograma.idRelacionado")
+              i.bi.bi-trash(aria-hidden='true')
+      .empty-findings(v-if='!itemodontograma?.hallazgos?.length') No hay hallazgos registrados.
 
 </template>
-<style scoped>
-.table> :not(caption)>*>* {
-  padding: 0.01rem 0.01rem;
-  background-color: var(--bs-table-bg);
-  border-bottom-width: 1px;
-  box-shadow: inset 0 0 0 9999px var(--bs-table-accent-bg);
-}
-</style>
 <style lang="sass" scoped>
+.findings-list
+  width: 100%
+  padding: .25rem
+
+.table-heading
+  color: var(--brand-navy)
+  background: #eef4ff
+  border-radius: 12px
+  box-shadow: none
+  font-weight: 700
+
+.finding-row
+  border-radius: 12px
+  box-shadow: none
+  transition: border-color .18s ease, background-color .18s ease
+  &:hover
+    border-color: rgba(var(--brand-blue-rgb), .28)
+    background: #f7faff
+
+.finding-label
+  color: var(--text-secondary)
+  font-size: .82rem
+  font-weight: 700
+
+.empty-findings
+  padding: 2rem 1rem
+  color: var(--text-secondary)
+  text-align: center
+
 .elevar
   position: relative
   z-index: 3 !important

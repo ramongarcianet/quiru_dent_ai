@@ -24,8 +24,8 @@ function ocultarAyuda() {
     a(href='#SeccionPrincipal' style="color: black; cursor: default" id="act1" @click="ocultarAyuda()")
       i.bi.bi-x-lg.fs-3(style="margin-top: 5px; margin-left: 10px")
 span.m-1(style='font-weight: bold; font-size: 12px; color:var(--brand-navy)') Pruebe diciendo un ejemplo, QUIRU Dent AI está escuchando
-.Contenido  
-  table.table.table-bordered.table-striped
+.Contenido.help-list
+  table.table.help-table
     thead(style='position: sticky;top: 0')
       tr(style='background-color: white;')
         th.Cabecera Ejemplos de voz
@@ -38,7 +38,7 @@ span.m-1(style='font-weight: bold; font-size: 12px; color:var(--brand-navy)') Pr
 
 </template>
 
-<style>
+<style scoped>
 .parpadea {
 
   animation-name: parpadeo;
@@ -103,5 +103,39 @@ span.m-1(style='font-weight: bold; font-size: 12px; color:var(--brand-navy)') Pr
   width: 100%;
   height: 300px;
   overflow: auto;
+}
+
+.help-list {
+  margin-top: .5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: white;
+}
+
+.help-table {
+  margin: 0;
+  color: var(--brand-navy);
+}
+
+.help-table thead,
+.help-table thead tr,
+.help-table thead th {
+  background: #eef4ff !important;
+}
+
+.help-table th,
+.help-table td {
+  padding: .7rem .85rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.help-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.help-table tbody tr:hover {
+  background: #f7faff;
 }
 </style>

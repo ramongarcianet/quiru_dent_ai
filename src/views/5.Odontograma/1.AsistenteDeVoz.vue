@@ -408,7 +408,7 @@ function imprimirContenidoSeleccionado() {
           .modal-body
             form
               .row.mb-3
-                .card.resumen-tabla.d-none.d-md-block.mx-1(style="border-radius: 30px; background-color:var(--color-light) !important;")
+                .card.resumen-tabla.summary-table-heading.d-none.d-md-block.mx-1
                   .row.p-1(style="color:var(--brand-navy);font-weight: bold;")
                     .col-1 CIE 10
                     .col-3 Diagnóstico
@@ -417,7 +417,7 @@ function imprimirContenidoSeleccionado() {
                     .col-1.text-center Costo
                     .col-2.text-center A Cuenta
                     .col-1.text-center Resto
-                .card.resumen-tabla.mt-1.d-none.d-md-block(v-for="item of listaResumen" style="border-radius: 40px; border-color: #839192")
+                .card.resumen-tabla.summary-row.mt-2.d-none.d-md-block(v-for="item of listaResumen")
                   .row.p-1.m-1         
                     .col-1 {{item.CIE10}}
                     .col-3 {{item.diagnostico}}
@@ -426,15 +426,22 @@ function imprimirContenidoSeleccionado() {
                     .col-1.text-center {{item.monto}}
                     .col-2.text-center {{item.acuenta}}
                     .col-1.text-center {{item.monto - item.acuenta}}
-                .card.resumen-movil.mt-1.d-block.d-md-none(v-for="item of listaResumen" style="border-radius: 40px; border-color: #839192")
-                  .row.p-1.m-1         
-                    .col-md-2.col-12 CIE10: {{item.CIE10}}
-                    .col-md-6.col-12 Diagnóstico: {{item.diagnostico}}
-                    .col-md-2.col-12 Cantidad: {{item.cantidad}}
-                    .col-md-2.col-12 Dientes: {{item.dientes}}
-                    .col-md-2.col-12 Costo: {{item.monto}}
-                    .col-md-2.col-12 A Cuenta: {{item.acuenta}}
-                    .col-md-2.col-12 Resto: {{item.monto - item.acuenta}}
+                .card.resumen-movil.summary-row.mt-2.d-block.d-md-none(v-for="item of listaResumen")
+                  .row.g-2.p-2
+                    .col-4.summary-label CIE 10
+                    .col-8 {{item.CIE10}}
+                    .col-4.summary-label Diagnóstico
+                    .col-8 {{item.diagnostico}}
+                    .col-4.summary-label Cantidad
+                    .col-8 {{item.cantidad}}
+                    .col-4.summary-label Piezas
+                    .col-8 {{item.dientes}}
+                    .col-4.summary-label Costo
+                    .col-8 {{item.monto}}
+                    .col-4.summary-label A cuenta
+                    .col-8 {{item.acuenta}}
+                    .col-4.summary-label Resto
+                    .col-8 {{item.monto - item.acuenta}}
           .modal-footer
             button.btn.btn-primary(type='button' @click='imprimirContenidoSeleccionado()') Imprimir
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal' id="CerrarCIE10") Salir
@@ -447,6 +454,29 @@ function imprimirContenidoSeleccionado() {
   --cariLeft: 0%
   --burbujaTop: 0%
   --burbujaLeft: 0%
+
+.summary-table-heading
+  color: var(--brand-navy)
+  background: #eef4ff !important
+  border: 1px solid var(--color-border)
+  border-radius: 12px
+  box-shadow: none
+  font-weight: 700
+
+.summary-row
+  border: 1px solid var(--color-border)
+  border-radius: 12px
+  box-shadow: none
+  transition: border-color .18s ease, background-color .18s ease
+  &:hover
+    border-color: rgba(var(--brand-blue-rgb), .28)
+    background: #f7faff
+
+.summary-label
+  color: var(--text-secondary)
+  font-size: .82rem
+  font-weight: 700
+
 .elevar
   position: relative
   z-index: 3 !important

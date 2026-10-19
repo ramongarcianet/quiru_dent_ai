@@ -2,9 +2,6 @@ import { ref } from 'vue';
 import { setDoc, addDoc, collection, onSnapshot, getDoc, doc, updateDoc, deleteDoc, orderBy, query, where, Firestore } from 'firebase/firestore'
 import { firestore } from '../config/firebase'
 import { usuario } from '../store/sesion'
-import moment from 'moment'
-moment.locale('es-ES');
-
 const dialog = ref(false)
 
 const cita = ref({
@@ -21,11 +18,15 @@ const cita = ref({
   UserId: '',
 })
 export const _event = ref([])
-const guardarCita = item => {
-  const mesActual = moment().format('MMMM')
+const guardarCita = async item => {
   const referencia = collection(firestore, 'citas')
-  return addDoc(referencia, { ...item, UserId: usuario.value.uid, 
-    estado: true }).then(newdoc=> updateDoc(doc(firestore, 'citas', newdoc.id) ,{id:newdoc.id}))
+  const newdoc = await addDoc(referencia, {
+    ...item,
+    UserId: usuario.value.uid,
+    estado: true
+  })
+  await updateDoc(doc(firestore, 'citas', newdoc.id), { id: newdoc.id })
+  return newdoc.id
 }
 
 const actualizar = (item) => {

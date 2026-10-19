@@ -1,5 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 //import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -62,8 +63,25 @@ let app
 let firestore
 let auth
 let storage
+let appCheck
 const iniciarFirebase = ()=> {
     app = initializeApp(firebaseConfig);
+    const isLocalDevelopment = import.meta.env.DEV
+      && typeof window !== 'undefined'
+      && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY
+
+    if (isLocalDevelopment) {
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || true
+    }
+
+    if (isLocalDevelopment || appCheckSiteKey) {
+      appCheck = initializeAppCheck(app, {
+        // En modo debug Firebase intercambia el token local antes de usar este proveedor.
+        provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey || 'debug-mode'),
+        isTokenAutoRefreshEnabled: true
+      })
+    }
     //analytics = getAnalytics(app);
     firestore = getFirestore();
     auth = getAuth();
@@ -72,8 +90,10 @@ const iniciarFirebase = ()=> {
 
 export {
   iniciarFirebase,
+  app,
   firestore,
   //analytics,
   auth,
-  storage
+  storage,
+  appCheck
 }

@@ -213,16 +213,15 @@ if (typeof speechSynthesis !== 'undefined') {
     };
 }
 
-export function speak(pHablar) {
+export function speak(pHablar, options = {}) {
 
     if (synth.speaking) {
-        //console.error('speechSynthesis.speaking');
-        return;
+        synth.cancel();
     }
     if (pHablar !== '') {
         const arregloDePalabras = pHablar.split(" ")
         const frase = arregloDePalabras.map(item => !Number(item) ? item : convertirEnPalabra(Number(item))).join(" ")
-        const shouldPauseRecognition = !isSpeech.value;
+        const shouldPauseRecognition = options.manageRecognition !== false && !isSpeech.value;
         const tiempoEnPausa = frase.length / 2 * 150
         if (shouldPauseRecognition) {
             detenerInicializarVoz()
@@ -231,11 +230,16 @@ export function speak(pHablar) {
         let utterThis = new SpeechSynthesisUtterance(pHablar);
         utterThis.lang = 'es-MX';
         utterThis.voice = getPreferredVoice();
-        utterThis.pitch = '1';
-        utterThis.rate = '1';
-        synth.speak(utterThis);
+        utterThis.pitch = Number(options.pitch || 1);
+        utterThis.rate = Number(options.rate || 1);
+        return new Promise(resolve => {
+            utterThis.onend = resolve;
+            utterThis.onerror = resolve;
+            synth.speak(utterThis);
+        });
 
     }
+    return Promise.resolve();
 }
 
 

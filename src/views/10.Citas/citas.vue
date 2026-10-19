@@ -18,6 +18,7 @@ import { obtenerTodos as obtenerTodosPaciente, leer as leerPaciente, registro as
 import { item as ItemUsuario, leer as LeerUser, registro as RegistroUsuario, leerEnRegistro } from '../../store/usuario'
 import { miUsuario, item as itemUser } from '../../store/sesion'
 import { esLetra, esNumero } from '../../config/libreria'
+import VoiceAppointmentAssistant from '../../components/citas/VoiceAppointmentAssistant.vue'
 const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const maxDocumento = ref(9);
 const { push, back } = useRouter();
@@ -271,22 +272,18 @@ const guardarAmbas = () => {
     return guardarCitaCompleta()
   }
 }
-const guardarCitaCompleta = (idPaciente) => new Promise((resolve, reject) => {
+const guardarCitaCompleta = (idPaciente) => {
   cita.value.idPaciente = idPaciente || itemPaciente.value.id;
   cita.value.email = "" || itemPaciente.value.email;
   cita.value.location = "" || ItemUsuario.value.nombreconsultorio + " - " + ItemUsuario.value.direccion;
   let index = registro.value?.findIndex(i => i.id == cita.value.id);
   if (index == -1 || index == undefined) {
-    guardarCita(cita.value)
-    resolve()
-    return
+    return guardarCita(cita.value)
   }
   else {
-    actualizar(cita.value);
-    resolve()
-    return
+    return actualizar(cita.value);
   }
-});
+};
 
 function GetPaciente(val) {
   if (val.target.value == '') {
@@ -435,10 +432,12 @@ function createEventDisponible(item) {
 </script>
 
 <template lang="pug">
-.row.mb-3
-  .col-12
-    span.eyebrow Agenda clínica
-    h1.page-title Citas
+.row.mb-2
+  .col-12.citas-page-header
+    div
+      span.eyebrow Agenda clínica
+      h1.page-title Citas
+    VoiceAppointmentAssistant
 .row 
   .col-12
     label.form-check-label.availability-toggle(for='chkDisponibilidad')
@@ -611,6 +610,16 @@ function createEventDisponible(item) {
   font-size: clamp(1.75rem, 3vw, 2.25rem)
   font-weight: 800
 
+.citas-page-header
+  display: flex
+  align-items: flex-end
+  justify-content: space-between
+  gap: .75rem
+  flex-wrap: wrap
+
+.citas-page-header .voice-assistant-entry
+  margin-bottom: 0
+
 .availability-toggle
   display: inline-flex
   align-items: center
@@ -646,6 +655,10 @@ function createEventDisponible(item) {
     border-color: var(--color-border)
 
 @media (max-width: 767px)
+  .citas-page-header
+    align-items: center
+  .citas-page-header .voice-assistant-entry
+    margin-left: auto
   .calendar-surface
     padding: .5rem
   .fc .fc-toolbar
