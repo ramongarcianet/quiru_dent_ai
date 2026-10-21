@@ -1,0 +1,20 @@
+// Fragmento para integrar y revisar con las reglas Firestore vigentes antes de una prueba remota.
+// No está enlazado a firebase.json y no se despliega automáticamente.
+match /odontogramaAiSessions/{sessionId} {
+  allow create: if request.auth != null
+    && request.resource.data.userId == request.auth.uid;
+  allow read: if request.auth != null
+    && resource.data.userId == request.auth.uid;
+  allow update: if request.auth != null
+    && resource.data.userId == request.auth.uid
+    && resource.data.status != 'COMPLETED'
+    && request.resource.data.userId == resource.data.userId
+    && request.resource.data.patientId == resource.data.patientId;
+  allow delete: if false;
+}
+
+match /odontogramaAiMetrics/{metricId} {
+  allow create: if request.auth != null
+    && !request.resource.data.keys().hasAny(['patientId', 'patientName', 'documentNumber', 'transcript', 'audio']);
+  allow read, update, delete: if false;
+}

@@ -1,11 +1,10 @@
 <script setup>
 import { onMounted, onUnmounted, watch, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { item, guardar, actualizar, limpiar, leerEnRegistro, revisarDNI, registro, obtenerTodos } from "../../store/paciente";
+import { item, guardar, actualizar, limpiar, leer, revisarDNI, registro, obtenerTodos } from "../../store/paciente";
 import { esLetra, esNumero } from '../../config/libreria'
-import { connectStorageEmulator } from "@firebase/storage";
 const maxDocumento = ref(8);
-const obtenerRegistro = obtenerTodos();
+const detenerPacientes = obtenerTodos();
 const guardarOActualizar = () => {
   var alerta = document.getElementById("alerta");
   alerta.style.display = "none"
@@ -25,16 +24,14 @@ const guardarOActualizar = () => {
 }
 const route = useRoute()
 const { back, push } = useRouter()
-let obtener
-if (route.params.idPaciente) {
-  leerEnRegistro(route.params.idPaciente)
-} else {
+if (!route.params.idPaciente) {
   limpiar()
 }
 onUnmounted(() => {
-  if (obtener) obtener();
+  if (typeof detenerPacientes === 'function') detenerPacientes();
 })
-onMounted(() => {
+onMounted(async () => {
+  if (route.params.idPaciente) await leer(route.params.idPaciente)
   incompleto();
 })
 function definirMaxLimit(tipoDocumento) {
@@ -74,11 +71,18 @@ function incompleto() {
 </script>
 
 <template lang="pug">
-h1.my-0(style="color: var(--brand-navy); font-size: 1.5em") Nuevo
-h1(style="color: var(--brand-blue); font-weight:bold; font-size: 1.5em") paciente
-button.btn.btn-outline-primary.border-0(@click="back()" )
-  i.bi.bi-arrow-left.fs-3
-Form( :onPromise='() => guardarOActualizar()' :onSuccess='() => back()' :onError='incompleto()')
+header.patient-form-header
+  div
+    span.eyebrow Pacientes
+    h1 {{ route.params.idPaciente ? 'Editar paciente' : 'Nuevo paciente' }}
+    p.mb-0 {{ route.params.idPaciente ? 'Actualiza la información personal y médica registrada.' : 'Registra la información general y médica del paciente.' }}
+  button.btn.btn-outline-secondary(
+    type='button'
+    @click="route.params.idPaciente ? push({ name: 'pacienteVer', params: { idPaciente: route.params.idPaciente } }) : push({ name: 'pacientes' })"
+  )
+    i.bi.bi-arrow-left.me-2
+    | {{ route.params.idPaciente ? 'Paciente' : 'Pacientes' }}
+Form.patient-form-card(:onPromise='() => guardarOActualizar()' :onSuccess='() => back()' :onError='incompleto()')
   .row
     .col-md-6 
       label.form-label Nombres y Apellidos*     
@@ -234,19 +238,170 @@ Form( :onPromise='() => guardarOActualizar()' :onSuccess='() => back()' :onError
               input.form-control(placeholder="Altura cm.", v-model="item.estatura" @keypress="esNumero($event)" maxlength="5")
 
   .col-12.col-md-4.mx-auto.mt-3.mb-5
-    button#btguardar.w-100.text-white.text-start.btn.btn-primary.d-flex.justify-content-between.px-5.align-items-center(
-      type='submit', disabled style="border-radius: 50px"
-    )
+    button#btguardar.save-patient.btn.btn-primary(type='submit' disabled)
       span
-        small
-          strong(v-if="!item.id") Guardar
-          strong(v-if="item.id") Actualizar
-        p.mb-0(v-if="!item.id") Nuevo Paciente
-        p.mb-0(v-if="item.id") Paciente
-      i.bi.bi-floppy.fs-4.ms-5(style=" color: white;")
+        strong(v-if="!item.id") Guardar paciente
+        strong(v-if="item.id") Actualizar paciente
+        small Revisa los datos antes de continuar
+      i.bi.bi-floppy
   .row.mb-5
     #alerta.alert.alert-danger.alert-dismissible(style='display:none')   
       strong Cuidado! te falta completar campos
 </template>
+
+<style scoped>
+.patient-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.patient-form-header h1 {
+  margin: .15rem 0;
+  color: var(--brand-navy);
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+
+.patient-form-header p {
+  color: var(--text-secondary);
+}
+
+.eyebrow {
+  color: var(--color-primary);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.patient-form-card {
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.patient-form-card > .row:first-child {
+  row-gap: 1rem;
+}
+
+.patient-form-card .form-label {
+  margin: .85rem 0 .35rem;
+  color: #526179;
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.patient-form-card .form-control,
+.patient-form-card .form-select {
+  min-height: 42px;
+  border-color: #d7e0ec;
+  border-radius: 10px;
+}
+
+.patient-form-card textarea.form-control {
+  min-height: 96px;
+}
+
+.patient-form-card .form-control:focus,
+.patient-form-card .form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 .2rem rgba(0, 102, 255, .1);
+}
+
+.patient-form-card .accordion-item {
+  overflow: hidden;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 14px !important;
+}
+
+.patient-form-card .accordion-button {
+  color: var(--brand-navy);
+  background: #f8faff;
+  font-weight: 800;
+}
+
+.patient-form-card .accordion-button:not(.collapsed) {
+  color: var(--color-primary);
+  background: #f1f6ff;
+  box-shadow: inset 0 -1px 0 var(--color-border);
+}
+
+.patient-form-card .accordion-body {
+  padding: 1.1rem;
+}
+
+.patient-form-card .accordion-body .col-6 {
+  margin-bottom: .7rem;
+}
+
+.save-patient {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .75rem 1rem;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.save-patient span {
+  display: grid;
+  gap: .05rem;
+}
+
+.save-patient small {
+  color: rgba(255, 255, 255, .8);
+}
+
+.save-patient i {
+  color: #fff;
+  font-size: 1.3rem;
+}
+
+#alerta {
+  margin-top: 1rem;
+  border-radius: 12px;
+}
+
+@media (max-width: 767px) {
+  .patient-form-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .patient-form-header .btn {
+    width: 100%;
+  }
+
+  .patient-form-card {
+    padding: 1rem;
+  }
+
+  .patient-form-card .input-group {
+    gap: .5rem;
+  }
+
+  .patient-form-card .input-group > .form-control,
+  .patient-form-card .input-group > .form-select {
+    width: 100%;
+    flex: 1 1 100%;
+    border-radius: 10px !important;
+  }
+
+  .patient-form-card .accordion-body .col-6 {
+    width: 100%;
+  }
+}
+</style>
 
 

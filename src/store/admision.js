@@ -37,13 +37,22 @@ export const obtenerTodos = idPaciente => {
     } )
 }
 
+export const leer = async idPaciente => {
+    const referencia = query(collection(firestore, 'admision'), where('idPaciente', '==', idPaciente))
+    const resultado = await getDocs(referencia)
+    item.value = resultado.empty
+        ? {}
+        : { ...resultado.docs[0].data(), id: resultado.docs[0].id }
+    return item.value
+}
+
 export const leerEnRegistro = computed( ()=> idPaciente => {
     return item.value = registro.value.find(item => item.idPaciente == idPaciente) || {}
 } )
 
 export const obtenerPacienteAdmision = idPaciente => new Promise( resolve => {
     const referencia = query(collection(firestore, 'admision'), where( 'idPaciente', '==', idPaciente))
-    return getDocs( referencia ).then( coll => resolve(coll.docs.map(item => ({...item.data(), id: item.ida}))) )
+    return getDocs( referencia ).then( coll => resolve(coll.docs.map(item => ({...item.data(), id: item.id}))) )
 } )
 
 export const limpiar = () => {

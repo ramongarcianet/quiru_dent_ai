@@ -18,7 +18,16 @@ const cita = ref({
   UserId: '',
 })
 export const _event = ref([])
-const guardarCita = async item => {
+const guardarCita = async (item, appointmentId = '') => {
+  if (appointmentId) {
+    await setDoc(doc(firestore, 'citas', appointmentId), {
+      ...item,
+      id: appointmentId,
+      UserId: usuario.value.uid,
+      estado: true
+    })
+    return appointmentId
+  }
   const referencia = collection(firestore, 'citas')
   const newdoc = await addDoc(referencia, {
     ...item,

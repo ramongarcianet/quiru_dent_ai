@@ -98,7 +98,12 @@ const obtenerTodosDni = () => {
 
 const leer = id => {
     const referencia = doc(firestore, 'paciente', id)
-    return getDoc(referencia).then(doc => item.value = doc.data())
+    return getDoc(referencia).then(snapshot => {
+        item.value = snapshot.exists()
+            ? { ...snapshot.data(), id: snapshot.id }
+            : null
+        return item.value
+    })
 }
 
 const leerEnRegistro = id => {

@@ -1,68 +1,87 @@
 <script setup>
-import { ref, watch } from "vue";
+import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { item, guardar, actualizar, leerEnRegistro, obtenerTodos, registro }  from '../../store/admision.js'
+import { item, guardar, actualizar, leer }  from '../../store/admision.js'
 import {progressFile, setFile, borrarFile } from '../../store/storage.js';
 import InputFile from "../../components/FileInput.vue";
 
 const route = useRoute()
 const { back } = useRouter()
-const idPaciente = route.params.idPaciente
-const guardarOActualizar = (item, idPaciente) => {
-  if (item.id) return actualizarDOC(item);
-  else return guardar(item, idPaciente);
-};
+const idPaciente = String(route.params.idPaciente || '')
+const cargando = ref(true)
+const errorCarga = ref('')
+const guardarOActualizar = async () => {
+  mensaje.value = ''
+  hayError.value = false
+
+  try {
+    const datos = { ...item.value }
+    const archivosGuardados = Array.isArray(datos.archivos) ? [...datos.archivos] : []
+
+    for (const [key, value] of Object.entries(datos)) {
+      if (typeof FileList !== 'undefined' && value instanceof FileList) {
+        for (const archivo of Array.from(value)) {
+          archivosGuardados.push(await setFile(archivo, idPaciente))
+        }
+        delete datos[key]
+        delete item.value[key]
+      }
+    }
+
+    datos.archivos = archivosGuardados
+    item.value.archivos = archivosGuardados
+
+    const resultado = datos.id
+      ? await actualizar(datos)
+      : await guardar(datos, idPaciente)
+
+    progressFile.value = 0
+    return resultado
+  } catch (error) {
+    hayError.value = true
+    mensaje.value = 'No se pudo guardar la admisión. Intenta nuevamente.'
+    throw error
+  }
+}
 const eliminarDelDocumento = (file, i) => {
   item.value.archivos.splice(i, 1)
   borrarFile(file)
-  actualizar(item.id)
+  actualizar(item.value)
 }
-obtenerTodos(route.params.idPaciente)
 const mensaje = ref('')
 const hayError = ref(false)
-const actualizarDOC = () => new Promise( async(resolve, reject) =>   { 
-  try {
-    mensaje.value = ''
-    const keys = Object.keys(item.value)
-    for ( let key of keys ){
-      const isFileList = item.value[key] instanceof FileList
-      if( isFileList && item.value[key].length > 0){
-      const listaDeUrl = []
-      const length = item.value[key].length
-      const listaDeImagenes = []
-      for ( let i = 0; i<length; i++){
-        listaDeImagenes.push(item.value[key][i])
-      }
-      for await( let item of listaDeImagenes ) {
-        const url = await setFile(item, idPaciente) 
-        listaDeUrl.push(url)
-      }
-      item.value[key] = null
-      item.value.archivos = item.value.archivos
-                              ? [...item.value.archivos, ...listaDeUrl] 
-                              : [...listaDeUrl]
-    }
-    }
-    await actualizar(item.value)
-    progressFile.value = 0
-    hayError.value=false
-    resolve()
+
+onMounted(async () => {
+  if (!idPaciente) {
+    errorCarga.value = 'No se recibió el identificador del paciente.'
+    cargando.value = false
+    return
   }
-  catch (e ){ 
-    hayError.value=true
-    reject(e)
+  try {
+    await leer(idPaciente)
+  } catch (error) {
+    console.error('No se pudo cargar la admisión:', error)
+    errorCarga.value = 'No se pudieron cargar los datos de admisión. Intenta nuevamente.'
+  } finally {
+    cargando.value = false
   }
 })
 </script>
 
 <template lang="pug">
 
-
-Form( :onPromise='() => guardarOActualizar(item, idPaciente)' :onSuccess='() => back()')
+.admission-state(v-if='cargando')
+  .spinner-border.text-primary(role='status' aria-hidden='true')
+  span Cargando datos de admisión…
+.admission-state.error(v-else-if='errorCarga' role='alert')
+  i.bi.bi-exclamation-triangle
+  span {{ errorCarga }}
+template(v-else)
+ Form.admission-form(:onPromise='guardarOActualizar' :onSuccess='() => back()')
   .row
     .col-md-6
       .col.mb-1
-        span.input-group-text.mb-1(style="background-color: var(--color-light); font-weight: bold; color:var(--brand-navy);") Datos Generales del Paciente
+        h2.form-section-title Datos generales del paciente
       .col.mb-1
         span(style="padding: .01rem .01rem .01rem .6rem;") Ocupación :
         input.form-control(placeholder="", v-model="item.ocupacion")
@@ -76,7 +95,7 @@ Form( :onPromise='() => guardarOActualizar(item, idPaciente)' :onSuccess='() => 
         span(style="padding: .01rem .01rem .01rem .6rem;") Viajes de los últimos años :
         input.form-control(placeholder="", v-model="item.viajesUltimos")
       .col.mb-1
-        span.input-group-text.mb-1(style="background-color: var(--color-light); font-weight: bold; color:var(--brand-navy);") Antecedentes
+        h2.form-section-title Antecedentes
       .col.mb-1
         span(style="padding: .01rem .01rem .01rem .6rem;") Familiares :
         input.form-control(placeholder="", v-model="item.antecedentesFam")
@@ -84,7 +103,7 @@ Form( :onPromise='() => guardarOActualizar(item, idPaciente)' :onSuccess='() => 
         span(style="padding: .01rem .01rem .01rem .6rem;") Personales :
         input.form-control(placeholder="", v-model="item.antecedentesPer")
       .col.mb-1
-        span.input-group-text.mb-1(style="background-color: var(--color-light); font-weight: bold; color:var(--brand-navy);") Signos vitales
+        h2.form-section-title Signos vitales
       .col.mb-1
         span(style="padding: .01rem .01rem .01rem .6rem;") Temperatura :     
         input.form-control(placeholder="", v-model="item.temperatura" maxlength="2")
@@ -102,7 +121,7 @@ Form( :onPromise='() => guardarOActualizar(item, idPaciente)' :onSuccess='() => 
         input.form-control(placeholder="", v-model="item.fResp" maxlength="2")
     .col-md-6
       .col.mb-1
-        span.input-group-text.mb-1(style="background-color: var(--color-light); font-weight: bold; color:var(--brand-navy);") Datos de la consulta
+        h2.form-section-title Datos de la consulta
       .col.mb-1
         span(style="padding: .01rem .01rem .01rem .6rem;") Motivo :
         input.form-control(placeholder="", v-model="item.motivoConsulta")
@@ -133,17 +152,18 @@ Form( :onPromise='() => guardarOActualizar(item, idPaciente)' :onSuccess='() => 
         .progress-bar(role="progressbar" :style="`width: ${progressFile}%;`" ) {{progressFile.toFixed(0)}} %
     .row.mt-2
       #mensaje.alert.alert-dismissible( v-if='mensaje' :class='hayError? "alert-danger" : "alert-success" ' ) {{mensaje}}
-  .col-12.col-md-4.mx-auto.mt-3.mb-5
-    button.w-100.text-white.text-start.btn.btn-primary.d-flex.justify-content-between.px-5.align-items-center(
-      type='submit', style="border-radius: 50px"
-    )
-      span
-        small
-          strong Guardar
-        p.mb-0 Admisión
-      i.bi.bi-floppy.fs-4.ms-5(style=" color: white;")
-.card.card-body.mt-2(style="margin-bottom: 50px")
-  .div(style="background-color: white; border-radius: 2%;")
+    .col-12.col-md-4.mx-auto.mt-3.mb-5
+      button.save-admission.btn.btn-primary(type='submit')
+        span
+          strong Guardar admisión
+          small Conserva los datos clínicos ingresados
+        i.bi.bi-floppy
+ .attachments-card
+  .attachments-header
+    div
+      h2 Archivos adjuntos
+      p.mb-0 Documentos asociados a esta admisión
+  .attachments-body
     table.table.table-hover
       thead(style="border-radius: 30px; background-color:var(--color-light) !important;")
         tr
@@ -157,4 +177,143 @@ Form( :onPromise='() => guardarOActualizar(item, idPaciente)' :onSuccess='() => 
             BotonSeguro( :onSuccess= '() => eliminarDelDocumento(file, i)' )
               i.bi.bi-trash
 </template>
+
+<style scoped>
+.admission-state {
+  display: flex;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  color: var(--text-secondary);
+  background: #fff;
+  font-weight: 700;
+}
+
+.admission-state.error {
+  color: #a13b48;
+  background: #fff8f8;
+}
+
+.admission-form,
+.attachments-card {
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.admission-form {
+  padding: 1.25rem;
+}
+
+.admission-form > .row {
+  row-gap: 1rem;
+}
+
+.admission-form > .row > .col-md-6 {
+  padding: 0 1rem;
+}
+
+.form-section-title {
+  margin: 1rem 0 .75rem;
+  padding-bottom: .55rem;
+  border-bottom: 1px solid #e5ebf4;
+  color: var(--brand-navy);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.form-section-title:first-child {
+  margin-top: 0;
+}
+
+.admission-form .col.mb-1 > span {
+  display: block;
+  margin-bottom: .3rem;
+  padding: 0 !important;
+  color: #526179;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.admission-form .form-control {
+  min-height: 42px;
+  border-color: #d7e0ec;
+  border-radius: 10px;
+}
+
+.admission-form .form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 .2rem rgba(0, 102, 255, .1);
+}
+
+.save-admission {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .75rem 1rem;
+  border-radius: 14px;
+  text-align: left;
+}
+
+.save-admission span {
+  display: grid;
+  gap: .05rem;
+}
+
+.save-admission small {
+  color: rgba(255, 255, 255, .8);
+}
+
+.save-admission i {
+  color: #fff;
+  font-size: 1.3rem;
+}
+
+.attachments-card {
+  overflow: hidden;
+  margin: 1rem 0 3rem;
+}
+
+.attachments-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: #f8faff;
+}
+
+.attachments-header h2 {
+  margin: 0 0 .15rem;
+  color: var(--brand-navy);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.attachments-header p {
+  color: var(--text-secondary);
+  font-size: .8rem;
+}
+
+.attachments-body {
+  padding: .75rem 1rem;
+}
+
+.attachments-body .table {
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .admission-form {
+    padding: 1rem;
+  }
+
+  .admission-form > .row > .col-md-6 {
+    padding: 0;
+  }
+}
+</style>
 

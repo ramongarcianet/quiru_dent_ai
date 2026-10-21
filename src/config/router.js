@@ -81,6 +81,11 @@ const routes = [
                 component: ()=>import('../views/3.Paciente/paciente.vue')
             },
             {
+                path: 'pacientes/:idPaciente/atencion-ai',
+                name: 'atencion-ai',
+                component: ()=>import('../views/5.OdontogramaAI/AtencionAI.vue')
+            },
+            {
                 path: 'paciente-informacion/:idPaciente?',
                 component: ()=> import('../views/5.Odontograma/InformacionPaciente.vue'),
                 children: [

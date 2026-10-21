@@ -11,6 +11,20 @@ export function normalizePatientSearch(value = '') {
     .trim()
 }
 
+export function classifyAppointmentVoiceCommand(value, { awaitingConfirmation = false } = {}) {
+  const normalized = normalizePatientSearch(value)
+  if (/^(cancelar|cancela|cancelalo|olvidalo|salir|detener)$/.test(normalized)) return 'cancel'
+  if (!awaitingConfirmation) return null
+  if (/^(si|confirmo|confirma|confirmar|confirmado|correcto|de acuerdo|esta bien|ok|okay|dale|listo|guardar|guarda|guardalo)$/.test(normalized)) return 'confirm'
+  if (/^(no|modificar|modifica|cambiar|cambia|quiero cambiar|corregir|corrige)$/.test(normalized)) return 'modify'
+  return null
+}
+
+export function appointmentDraftSpeechSummary(draft) {
+  if (!draft) return ''
+  return `${draft.patientName}, ${draft.dateLabel}, de ${draft.startTime} a ${draft.endTime}, por ${draft.reason}. ¿Confirmas?`
+}
+
 export function patientFullName(patient = {}) {
   return [patient.nombre, patient.apellidoPaterno, patient.apellidoMaterno]
     .filter(Boolean)

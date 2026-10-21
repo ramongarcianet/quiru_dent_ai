@@ -12,12 +12,15 @@ const mensajeErrorStorage = (codigo) => {
     }
     return mensajes[codigo] || 'No se pudo cargar el archivo. Inténtalo nuevamente.'
 }
-export const setFile = (file, idOdontograma) => new Promise( (resolve, reject )=> {
+export const setFile = (file, idOdontograma, uniquePath = false) => new Promise( (resolve, reject )=> {
     if(!file) return reject( false )
     if(file.type != 'image/jpeg' && file.type != 'image/png' && file.type != 'application/pdf') return reject('formato no admitido')
     if(file.size > 4000000) return reject('archivo muy pesado')
+    const uniqueFolder = uniquePath
+        ? `${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}/`
+        : ''
     const uploadTask = uploadBytesResumable(
-        StorageRef(storage, 'documento/'+ idOdontograma+'/' + file.name ),
+        StorageRef(storage, 'documento/'+ idOdontograma+'/' + uniqueFolder + file.name ),
         file, 
         { contentType: file.type }
     )
@@ -59,9 +62,8 @@ export const borrarFile = (file) => new Promise ((resolve, reject) => {
       });      
 })
 
+export const deleteStorageFile = (file) => deleteObject(StorageRef(storage, file))
 export const getUrlbyFileRef = (fileRef) => getDownloadURL(StorageRef(storage, fileRef))
 export const downloadbyFileRef = (fileRef) => getBytes(StorageRef(storage, fileRef))
 export const getMetadataByFileRef = (fileRef) => getMetadata(StorageRef(storage, fileRef))
-
-
 

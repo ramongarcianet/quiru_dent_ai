@@ -1,10 +1,12 @@
 <script setup>
 import { injectProp } from '@vue/compiler-core';
-import { onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { obtenerTodos, registro, updateEstado } from "../../store/paciente";
 import { previousPage, nextPage, setList, registro_, search, setListDelete, SetPage } from "../../config/Paginator";
 import { registroodonto, obtenerTodos as obtenerOdontograma } from "../../store/formodontograma";
+import { miUsuario } from "../../store/sesion";
+import { isConversationalOdontogramEnabled } from "../../config/conversationalOdontogram";
 const obtenerRegistro = obtenerTodos();
 const confirmar = ref(false);
 const { push } = useRouter();
@@ -14,6 +16,7 @@ const perPage = ref(5);
 const pageOptions = ref([5, 10, 15, { value: 100, text: 'Show a lot' }]);
 let itemseleccionado = {};
 const paginatedData = ref([]);
+const showAiAttention = computed(() => isConversationalOdontogramEnabled(miUsuario()?.uid));
 watch(
     () => registro.value,
     () => {
@@ -86,13 +89,15 @@ function searchData() {
                 .col-2.d-none.d-md-block Teléfono
                 .col-2.d-none.d-md-block Email
                 .col-1
-        .card.patient-row.mb-2.p-3.d-block.d-md-none(v-for="item of paginatedData" :key="item.id" :item="item" @click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })")
+        .card.patient-row.mb-2.p-3.d-block.d-md-none(v-for="item of paginatedData" :key="item.id" :item="item")
             .row.align-items-center.p-1(style="cursor: pointer")
-                .col-10 {{item.tipoDocumento + ' ' +item.numeroDocumento }}
-                .col-1.dropdown(style="max-height: 24px")
-                    button.ms-auto.btn.p-0.m-0(title='Odontograma')
+                .col-9(@click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })") {{item.tipoDocumento + ' ' +item.numeroDocumento }}
+                .col-3.d-flex.justify-content-end.gap-2(style="max-height: 32px")
+                    button.btn.p-0.m-0(title='Atención tradicional' @click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })")
                         i.bi.bi-person
-                .col-10 {{ item.nombre + ' ' + item.apellidoPaterno + ' ' + item.apellidoMaterno }}
+                    button.btn.ai-action.p-0.m-0(v-if="showAiAttention" title='Atención con QUIRU AI' @click="push({ name: 'atencion-ai', params: { idPaciente: item.id } })")
+                        i.bi.bi-stars
+                .col-12(@click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })") {{ item.nombre + ' ' + item.apellidoPaterno + ' ' + item.apellidoMaterno }}
 
         .card.patient-row.mb-2.p-2.d-none.d-md-block(v-for="item of paginatedData" :key="item.id" :item="item")
             .row.align-items-center.p-1(style="cursor: pointer")
@@ -101,10 +106,11 @@ function searchData() {
                 .col-3(@click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })") {{ item.nombre + ' ' + item.apellidoPaterno + ' ' + item.apellidoMaterno }} 
                 .col-2(@click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })") {{item.telefono}}
                 .col-2(@click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })") {{item.email}}
-                .col-1
-                .col-1.dropdown
-                    button.ms-auto.btn(title='Odontograma' @click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })")
+                .col-2.d-flex.justify-content-end.gap-1
+                    button.btn(title='Atención tradicional' aria-label='Atención tradicional' @click="push({ name: 'pacienteVer', params: { idPaciente: item.id } })")
                         i.bi.bi-person
+                    button.btn.ai-action(v-if="showAiAttention" title='Atención con QUIRU AI' aria-label='Atención con QUIRU AI' @click="push({ name: 'atencion-ai', params: { idPaciente: item.id } })")
+                        i.bi.bi-stars
         .empty-state(v-if='paginatedData.length === 0')
             i.bi.bi-people(aria-hidden='true')
             h2 Todavía no tienes pacientes registrados.
@@ -130,6 +136,13 @@ function searchData() {
     &:hover
         border-color: rgba(var(--brand-blue-rgb), .28)
         background: #f7faff
+
+.ai-action
+    color: #6d5ce7
+    background: #f3f0ff
+    &:hover
+        color: #fff
+        background: #6d5ce7
 
 .empty-state
     display: flex

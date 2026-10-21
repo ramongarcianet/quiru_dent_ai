@@ -34,7 +34,7 @@ Dialog(v-model='verDialog')
           Avatar
       #body
         .content-card
-          router-view
+          router-view(:key="$route.name === 'atencion-ai' ? $route.fullPath : undefined")
   Nav
 </template>
 

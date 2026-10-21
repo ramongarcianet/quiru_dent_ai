@@ -17,7 +17,9 @@ import { item as doctor } from './usuario'
 import { miUsuario, usuario } from './sesion'
 import { activarVoz, detenerVoz, isSpeech, speak } from './odontograma'
 import {
+  appointmentDraftSpeechSummary,
   buildVoiceAppointmentDraft,
+  classifyAppointmentVoiceCommand,
   countAppointmentOverlaps,
   patientFullName,
   searchAuthorizedPatients
@@ -28,12 +30,16 @@ export const voiceAppointmentState = ref('idle')
 export const voiceAppointmentError = ref('')
 export const voiceAppointmentDraft = ref(null)
 export const voicePatientMatches = ref([])
+export const voiceAppointmentMetrics = ref({ geminiRequests: 0, localTurns: 0 })
+export const voiceAppointmentMessage = ref('')
+export const voiceAppointmentTranscript = ref('')
 
 export const voiceAppointmentBusy = computed(() => [
   'requesting_permission', 'connecting', 'processing', 'creating'
 ].includes(voiceAppointmentState.value))
 
 let chatSession = null
+let appointmentModel = null
 let speechRecognition = null
 let conversationActive = false
 let wasOdontogramListening = false
@@ -53,6 +59,16 @@ function functionResponse(call, response) {
       response
     }
   }
+}
+
+function resetGeminiChat() {
+  chatSession = appointmentModel?.startChat?.() || null
+}
+
+function appointmentTurnInput(transcript) {
+  const draft = voiceAppointmentDraft.value
+  if (!draft) return transcript
+  return `Borrador actual: pacienteId=${draft.patientId}; paciente=${draft.patientName}; fecha=${draft.payload.start.slice(0, 10)}; horaInicio=${draft.startTime}; duracionMinutos=${draft.duration}; motivo=${draft.reason}. Solicitud del usuario: ${transcript}`
 }
 
 function safeErrorMessage(error) {
@@ -227,10 +243,17 @@ function createRecognition() {
   recognition.lang = 'es-PE'
   recognition.continuous = false
   recognition.interimResults = false
-  recognition.maxAlternatives = 1
+  recognition.maxAlternatives = 3
   recognition.onresult = event => {
-    const transcript = event.results?.[0]?.[0]?.transcript?.trim()
-    if (transcript) processVoiceTurn(transcript)
+    const result = event.results?.[event.results.length - 1]
+    const alternatives = result ? Array.from(result) : []
+    const transcript = alternatives
+      .sort((left, right) => (right.confidence || 0) - (left.confidence || 0))[0]
+      ?.transcript?.trim()
+    if (transcript) {
+      voiceAppointmentTranscript.value = transcript
+      processVoiceTurn(transcript)
+    }
   }
   recognition.onend = () => {
     if (!conversationActive || voiceAppointmentState.value === 'processing') return
@@ -258,41 +281,101 @@ function startListening() {
 
 async function speakAndContinue(text) {
   const conciseText = spokenText(text)
+  voiceAppointmentMessage.value = conciseText
   if (conciseText) await speak(conciseText, { manageRecognition: false, rate: 1.12 })
   if (!conversationActive || ['success', 'cancelled', 'error'].includes(voiceAppointmentState.value)) return
   startListening()
 }
 
-async function sendFunctionResult(call, responsePart) {
-  let result = await chatSession.sendMessage([responsePart])
-  let response = result.response
-  for (let turn = 0; turn < 3; turn += 1) {
-    const calls = response.functionCalls?.() || []
-    if (!calls.length) return response
-    const nextPart = await handleFunctionCalls(calls)
-    result = await chatSession.sendMessage([nextPart])
-    response = result.response
+async function sendToGemini(message) {
+  voiceAppointmentMetrics.value.geminiRequests += 1
+  return chatSession.sendMessage(message)
+}
+
+function localToolAnswer(call, responsePart) {
+  const response = responsePart?.functionResponse?.response || {}
+  if (response.error) return response.error
+  if (call.name === 'preparar_cita' && voiceAppointmentDraft.value) {
+    return appointmentDraftSpeechSummary(voiceAppointmentDraft.value)
   }
-  throw new Error('Se excedió el límite de acciones consecutivas del asistente.')
+  if (call.name === 'confirmar_cita' && response.success) {
+    return `Listo. La cita de ${response.paciente} quedó registrada para ${response.fecha}, de ${response.horaInicio} a ${response.horaFin}.`
+  }
+  if (call.name === 'cancelar_cita' && response.success) return 'Registro de cita cancelado.'
+  if (call.name === 'buscar_paciente') {
+    const found = response.encontrados || []
+    if (!found.length) return 'No encontré ese paciente. Indícame otro nombre o documento.'
+    if (found.length === 1) return `Encontré a ${found[0].nombreCompleto}. Indícame fecha, hora, duración y motivo.`
+    return `Encontré ${found.length} pacientes. Dime el nombre completo o documento.`
+  }
+  return 'Continúa, por favor.'
+}
+
+async function answerAfterFunction(call, responsePart) {
+  if (call.name !== 'buscar_paciente') {
+    const answer = localToolAnswer(call, responsePart)
+    resetGeminiChat()
+    return answer
+  }
+
+  const response = (await sendToGemini([responsePart])).response
+  const calls = response.functionCalls?.() || []
+  if (!calls.length) return response.text?.() || localToolAnswer(call, responsePart)
+
+  const nextCall = calls[0]
+  const nextPart = await handleFunctionCalls(calls)
+  const answer = localToolAnswer(nextCall, nextPart)
+  resetGeminiChat()
+  return answer
 }
 
 async function processVoiceTurn(transcript) {
   if (!conversationActive || !chatSession) return
   voiceAppointmentError.value = ''
-  voiceAppointmentState.value = 'processing'
   try {
-    let result = await chatSession.sendMessage(transcript)
-    let response = result.response
+    const localCommand = classifyAppointmentVoiceCommand(transcript, {
+      awaitingConfirmation: voiceAppointmentState.value === 'awaiting_confirmation' && Boolean(voiceAppointmentDraft.value)
+    })
+    if (localCommand) {
+      voiceAppointmentMetrics.value.localTurns += 1
+      if (localCommand === 'confirm') {
+        const result = await persistPreparedAppointment()
+        const answer = result.success
+          ? `Listo. La cita de ${result.paciente} quedó registrada para ${result.fecha}, de ${result.horaInicio} a ${result.horaFin}.`
+          : result.error
+        await speakAndContinue(answer)
+        if (result.success) await stopVoiceAppointmentConversation(false)
+        return
+      }
+      if (localCommand === 'modify') {
+        voiceAppointmentState.value = 'listening'
+        await speakAndContinue('¿Qué dato deseas cambiar?')
+        return
+      }
+      voiceAppointmentDraft.value = null
+      voiceAppointmentState.value = 'cancelled'
+      await speakAndContinue('Registro de cita cancelado.')
+      await stopVoiceAppointmentConversation(false)
+      return
+    }
+
+    voiceAppointmentState.value = 'processing'
+    const response = (await sendToGemini(appointmentTurnInput(transcript))).response
     const calls = response.functionCalls?.() || []
+    let answer
     if (calls.length) {
       const responsePart = await handleFunctionCalls(calls)
-      response = await sendFunctionResult(calls[0], responsePart)
+      answer = await answerAfterFunction(calls[0], responsePart)
+    } else {
+      answer = response.text?.() || 'Continúa, por favor.'
     }
-    const answer = response.text?.() || 'Continúa, por favor.'
     if (voiceAppointmentState.value === 'processing') {
       voiceAppointmentState.value = voiceAppointmentDraft.value ? 'awaiting_confirmation' : 'listening'
     }
     await speakAndContinue(answer)
+    if (['success', 'cancelled'].includes(voiceAppointmentState.value)) {
+      await stopVoiceAppointmentConversation(false)
+    }
   } catch (error) {
     console.error('[QUIRU] Error procesando la conversación de citas:', error)
     voiceAppointmentError.value = safeErrorMessage(error)
@@ -316,6 +399,9 @@ export async function startVoiceAppointmentConversation() {
   voiceAppointmentError.value = ''
   voiceAppointmentDraft.value = null
   voicePatientMatches.value = []
+  voiceAppointmentMetrics.value = { geminiRequests: 0, localTurns: 0 }
+  voiceAppointmentMessage.value = ''
+  voiceAppointmentTranscript.value = ''
   createdAppointmentId = null
   wasOdontogramListening = isSpeech.value
   if (wasOdontogramListening) detenerVoz()
@@ -329,15 +415,16 @@ export async function startVoiceAppointmentConversation() {
     }
     await getAppCheckToken(appCheck)
     const ai = getAI(app, { backend: new GoogleAIBackend() })
-    const model = getGenerativeModel(ai, {
+    appointmentModel = getGenerativeModel(ai, {
       model: QUIRU_TEXT_MODEL,
       systemInstruction: buildQuiruAppointmentInstruction(timeZone()),
       tools: QUIRU_APPOINTMENT_TOOLS,
       generationConfig: {
-        maxOutputTokens: 220
+        maxOutputTokens: 96,
+        temperature: 0.1
       }
     })
-    chatSession = model.startChat()
+    resetGeminiChat()
     speechRecognition = createRecognition()
     conversationActive = true
     voiceAppointmentState.value = 'requesting_permission'
@@ -381,6 +468,7 @@ export async function stopVoiceAppointmentConversation(restoreOdontogram = true)
   }
   speechRecognition = null
   chatSession = null
+  appointmentModel = null
   window.speechSynthesis?.cancel()
   if (restoreOdontogram && wasOdontogramListening) activarVoz()
   wasOdontogramListening = false

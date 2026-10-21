@@ -11,7 +11,9 @@ import {
   voiceAppointmentBusy,
   voiceAppointmentDraft,
   voiceAppointmentError,
+  voiceAppointmentMessage,
   voiceAppointmentState,
+  voiceAppointmentTranscript,
   voicePanelOpen
 } from '../../store/citasVoz'
 
@@ -68,6 +70,8 @@ Teleport(to='body')
         strong {{ statusText }}
         p(v-if="voiceAppointmentState === 'idle'") Presiona el micrófono y cuéntame para quién, cuándo y por qué deseas agendar.
         p(v-else-if="voiceAppointmentState === 'listening'") Puedes hablar con naturalidad. Te preguntaré cualquier dato que falte.
+        p.voice-message(v-if='voiceAppointmentMessage') {{ voiceAppointmentMessage }}
+        small.voice-transcript(v-if='voiceAppointmentTranscript') Entendí: {{ voiceAppointmentTranscript }}
 
       .alert.alert-danger(v-if='voiceAppointmentError' role='alert') {{ voiceAppointmentError }}
 
@@ -94,7 +98,7 @@ Teleport(to='body')
 
       .voice-privacy
         i.bi.bi-shield-check
-        span La conversación no se guarda. Gemini no tiene acceso directo a Firestore.
+        span La conversación no se guarda. Confirmar, modificar y cancelar se procesa localmente.
 
     footer.voice-panel-footer
       button.btn.btn-outline-secondary(type='button' @click='closePanel') Cerrar
@@ -224,6 +228,13 @@ Teleport(to='body')
       animation-delay: .15s
     &:nth-child(3)
       animation-delay: .3s
+
+.voice-message
+  font-weight: 650
+
+.voice-transcript
+  color: var(--text-secondary)
+  font-size: .78rem
 
 .voice-confirmation
   margin-top: 1rem
